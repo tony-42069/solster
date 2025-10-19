@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "programs/router",
+    "programs/slab",
+    "programs/common",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/yourusername/percolator"
+
+[workspace.dependencies]
+pinocchio = "0.7.0"
+pinocchio-log = "0.7.0"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+overflow-checks = true
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
