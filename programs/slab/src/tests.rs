@@ -236,3 +236,7 @@ mod header_tests {
         assert_eq!(header.current_ts, 12345);
     }
 }
+
+// NOTE: Order book operation tests are deferred to integration tests with surfpool
+// Testing with the full 10MB SlabState is complex in unit tests due to stack limitations
+// Integration tests will provide better coverage of book operations in a realistic environment
