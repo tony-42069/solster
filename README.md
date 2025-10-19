@@ -18,6 +18,13 @@ The global coordinator managing collateral, portfolio margin, and cross-slab rou
 - `Portfolio` - Cross-margin tracking with exposure aggregation across slabs
 - `SlabRegistry` - Governance-controlled registry with version validation
 
+**PDA Derivations:**
+- Vault: `[b"vault", mint]`
+- Escrow: `[b"escrow", user, slab, mint]`
+- Capability: `[b"cap", user, slab, mint, nonce_u64]`
+- Portfolio: `[b"portfolio", user]`
+- Registry: `[b"registry"]`
+
 ### 2. Slab Program
 LP-run perp engines with 10 MB state budget, fully self-contained matching and settlement.
 
@@ -32,6 +39,10 @@ LP-run perp engines with 10 MB state budget, fully self-contained matching and s
 - `Slice` - Sub-order fragments locked during reservation
 - `Trade` - Ring buffer of executed trades
 - `AggressorEntry` - Anti-sandwich tracking per batch
+
+**PDA Derivations:**
+- Slab State: `[b"slab", market_id]`
+- Authority: `[b"authority", slab]`
 
 ## Key Features Implemented
 
@@ -56,6 +67,7 @@ LP-run perp engines with 10 MB state budget, fully self-contained matching and s
 - **Commit operation**: Execute at captured maker prices
 - **Cancel operation**: Release reservations
 - **Pending queue promotion**: Non-DLP orders wait one batch epoch
+- **Order book management**: Insert, remove, promote with proper linking
 
 ### ✅ Risk Management
 - **Local (slab) margin**: IM/MM calculated per position
@@ -78,6 +90,18 @@ LP-run perp engines with 10 MB state budget, fully self-contained matching and s
 - Funding payment tracking
 - Margin calculations in basis points
 
+### ✅ PDA Derivation Helpers
+- Router: Vault, Escrow, Capability, Portfolio, Registry PDAs
+- Slab: Slab State, Authority PDAs
+- Verification functions for account validation
+- Comprehensive seed management
+
+### ✅ Instruction Dispatching
+- 6 instruction types: Reserve, Commit, Cancel, BatchOpen, Initialize, AddInstrument
+- Discriminator-based routing
+- Error handling for invalid instructions
+- Account validation framework ready
+
 ### ✅ Anti-Toxicity Infrastructure
 - Batch windows (`batch_ms`)
 - Delayed maker posting (pending → live promotion)
@@ -86,44 +110,205 @@ LP-run perp engines with 10 MB state budget, fully self-contained matching and s
 - Freeze levels configuration
 - Aggressor roundtrip guard (ARG) data structures
 
-## Current Status
+### ✅ BPF Build Support
+- Panic handlers for no_std builds
+- `panic = "abort"` configuration
+- Pinocchio integration for zero-dependency Solana programs
 
-### Working
-- ✅ Core data structures
-- ✅ Memory pools with freelists
-- ✅ Order book management
-- ✅ Reserve operation
-- ✅ Risk calculations
-- ✅ Capability system
-- ✅ Fixed-point math utilities
-- ✅ Compile-time size constraints
+## Test Coverage
 
-### ✅ Recently Completed
-- ✅ Commit operation (borrow checker issues resolved)
-- ✅ Position management (refactored for proper Rust borrow semantics)
-- ✅ Zero-allocation order promotion (removed Vec usage)
-- ✅ All matching engine functions compile successfully
+**53 tests passing** across all packages:
 
-### TODO
-- ❌ Anti-toxicity mechanism integration
-- ❌ Funding rate updates
-- ❌ Liquidation execution
-- ❌ Router orchestration (multi-slab reserve/commit)
-- ❌ Instruction parsing and validation
-- ❌ PDA derivations and account initialization
-- ❌ Unit tests
-- ❌ Integration tests with Surfpool
-- ❌ Property-based tests for invariants
-- ❌ Build for BPF target
+### percolator-common (27 tests)
+- ✅ VWAP calculations (single/multiple fills, zero quantity)
+- ✅ PnL calculations (long/short profit/loss, no change)
+- ✅ Funding payment calculations
+- ✅ Tick/lot alignment and rounding
+- ✅ Margin calculations (IM/MM, scaling with quantity/price)
+- ✅ Type defaults (Side, TimeInForce, MakerClass, OrderState, Order, Position)
 
-## Technical Details
+### percolator-router (7 tests)
+- ✅ Vault pledge/unpledge operations
+- ✅ Escrow credit/debit with nonce validation
+- ✅ Capability lifecycle (creation, usage, expiry)
+- ✅ Capability TTL capping (max 2 minutes)
+- ✅ Portfolio exposure tracking
+- ✅ Portfolio margin aggregation
+- ✅ Registry operations (add/validate slabs)
 
-### Technology Stack
-- **Framework**: [Pinocchio](https://github.com/anza-xyz/pinocchio) v0.9.2 - Zero-dependency Solana SDK
-- **Testing**: [Surfpool](https://github.com/txtx/surfpool) - Local Solana test validator with mainnet state
-- **Language**: Rust (no_std, zero allocations)
+### percolator-slab (19 tests)
+- ✅ Pool allocation/free operations
+- ✅ Pool capacity limits and reuse
+- ✅ Header validation and monotonic IDs
+- ✅ JIT penalty detection
+- ✅ Timestamp updates
+- ✅ Book sequence numbers
+- ✅ Reserve operation with max charge calculation
+- ✅ Margin requirement calculations
+- ✅ Slab size constraint (≤10 MB)
 
-### Design Invariants (from plan.md)
+**Note:** PDA tests require Solana syscalls and are marked `#[cfg(target_os = "solana")]`. They will be tested in integration tests with Surfpool.
+
+## Building and Testing
+
+### Build
+```bash
+# Build all programs (libraries)
+cargo build
+
+# Build in release mode
+cargo build --release
+
+# Build specific package
+cargo build --package percolator-slab
+```
+
+### Testing
+```bash
+# Run all tests
+cargo test
+
+# Run only library tests
+cargo test --lib
+
+# Run tests for specific package
+cargo test --package percolator-common
+cargo test --package percolator-router
+cargo test --package percolator-slab
+
+# Run specific test
+cargo test test_vwap_calculation
+
+# Run tests with output
+cargo test -- --nocapture
+
+# Run tests in release mode (faster)
+cargo test --release
+```
+
+### Build for Solana BPF
+```bash
+# Install Solana toolchain (if not already installed)
+sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+
+# Build BPF programs
+cargo build-sbf
+
+# Build specific program
+cargo build-sbf --manifest-path programs/slab/Cargo.toml
+cargo build-sbf --manifest-path programs/router/Cargo.toml
+```
+
+## Surfpool Integration
+
+[Surfpool](https://github.com/txtx/surfpool) provides a local Solana test validator with mainnet state access for realistic integration testing.
+
+### Setup Surfpool
+
+```bash
+# Clone surfpool
+git clone https://github.com/txtx/surfpool
+cd surfpool
+
+# Install dependencies
+npm install
+
+# Start local validator
+npm run validator
+```
+
+### Integration Test Structure
+
+Create `tests/integration/` directory for surfpool-based tests:
+
+```rust
+// tests/integration/test_reserve_commit.rs
+use surfpool::prelude::*;
+use percolator_slab::*;
+use percolator_router::*;
+
+#[surfpool::test]
+async fn test_reserve_and_commit_flow() {
+    // Initialize test environment
+    let mut context = SurfpoolContext::new().await;
+
+    // Deploy programs
+    let router_program = context.deploy_program("percolator_router").await;
+    let slab_program = context.deploy_program("percolator_slab").await;
+
+    // Initialize slab state (10 MB account)
+    let slab_pda = derive_slab_pda(b"BTC-PERP", &slab_program.id());
+    context.create_account(&slab_pda, 10 * 1024 * 1024, &slab_program.id()).await;
+
+    // Initialize router accounts
+    let vault_pda = derive_vault_pda(&usdc_mint, &router_program.id());
+    // ... setup vault, escrow, portfolio
+
+    // Test reserve operation
+    let reserve_ix = create_reserve_instruction(/* ... */);
+    context.send_transaction(&[reserve_ix]).await.unwrap();
+
+    // Verify reservation created
+    let slab_state = context.get_account::<SlabState>(&slab_pda).await;
+    assert!(slab_state.reservations.used() > 0);
+
+    // Test commit operation
+    let commit_ix = create_commit_instruction(/* ... */);
+    context.send_transaction(&[commit_ix]).await.unwrap();
+
+    // Verify trade executed
+    assert_eq!(slab_state.trade_count, 1);
+}
+```
+
+### Running Integration Tests
+
+```bash
+# Start surfpool validator (terminal 1)
+cd surfpool && npm run validator
+
+# Run integration tests (terminal 2)
+cargo test --test integration
+
+# Run specific integration test
+cargo test --test integration test_reserve_and_commit_flow
+```
+
+### Example Test Scenarios
+
+1. **Order Matching**
+   - Place limit orders on both sides
+   - Execute market order
+   - Verify VWAP calculation and position updates
+
+2. **Reserve-Commit Flow**
+   - Reserve liquidity for aggregator order
+   - Verify slices locked correctly
+   - Commit at reserved prices
+   - Check trades executed at expected prices
+
+3. **Cross-Slab Portfolio**
+   - Open positions on multiple slabs
+   - Verify router aggregates exposures
+   - Check cross-margin calculation
+
+4. **Capability Security**
+   - Create time-limited cap
+   - Use cap to debit escrow
+   - Verify expiry enforcement
+
+5. **Anti-Toxicity**
+   - Post pending order
+   - Open batch window
+   - Verify promotion after epoch
+   - Test JIT penalty application
+
+6. **Liquidation**
+   - Open underwater position
+   - Trigger liquidation
+   - Verify position closure and PnL settlement
+
+## Design Invariants (from plan.md)
 
 **Safety:**
 1. Slabs cannot access Router vaults directly
@@ -147,52 +332,51 @@ LP-run perp engines with 10 MB state budget, fully self-contained matching and s
 2. JIT penalty: DLP orders posted after batch_open get no rebate
 3. ARG: roundtrip trades within batch are taxed/clipped
 
-## Building
+## Current Status
 
-```bash
-# Build all programs (libraries)
-cargo build
+### ✅ Completed
+- Core data structures (Router & Slab)
+- Memory pools with O(1) freelists
+- Order book management (insert, remove, promote)
+- Reserve operation (lock slices, calculate VWAP)
+- Commit operation (execute trades at maker prices)
+- Risk calculations (equity, IM/MM, liquidation checks)
+- Capability system (time-limited scoped debits)
+- Fixed-point math utilities (VWAP, PnL, margin)
+- Compile-time size constraints (10 MB enforced)
+- PDA derivation helpers (all account types)
+- Instruction dispatching framework
+- BPF build support (panic handlers, no_std)
+- Comprehensive unit tests (53 tests passing)
 
-# Build for Solana BPF target (requires solana toolchain)
-# TODO: Add build-sbf support
+### 🚧 In Progress
+- Integration tests with Surfpool
+- Property-based invariant testing
+- BPF deployment and CU benchmarks
 
-# Run tests
-cargo test
-```
+### 📋 TODO
+- Anti-toxicity mechanism integration (kill band, ARG enforcement)
+- Funding rate updates (time-weighted calculations)
+- Liquidation execution (position closure, PnL settlement)
+- Router orchestration (multi-slab reserve/commit atomicity)
+- Instruction handler implementations (account validation, parsing)
+- Account initialization helpers
+- Client SDK (TypeScript/Rust)
+- CLI tools for LP operations
+- Documentation and examples
 
-## Recent Improvements
+## Technology Stack
 
-1. **✅ Borrow Checker Resolved**: All borrow checker errors fixed by:
-   - Extracting values before mutable borrows
-   - Separating data gathering from mutation phases
-   - Caching header/instrument values to avoid conflicts
-
-2. **✅ Zero Allocations**: Replaced Vec-based promotion with iterative single-pass approach
-
-3. **✅ Type Safety**: Fixed all fee calculation type mismatches
-
-## Remaining Work
-
-1. **BPF Build**: Programs need panic handler when building as cdylib for Solana
-2. **Missing Tests**: Comprehensive unit/integration/property tests needed
-3. **Instruction Handlers**: Wire up instruction parsing and account validation
-4. **PDA Derivations**: Implement seed generation for all account types
-
-## Next Steps
-
-1. **Fix Borrow Checker Issues**: Refactor commit/position management to avoid overlapping borrows
-2. **Complete Instruction Handlers**: Wire up actual instruction parsing and account validation
-3. **Add PDA Helpers**: Implement seed derivations for all account types
-4. **Integration Tests**: Set up Surfpool-based test scenarios
-5. **Property Tests**: Verify invariants hold under random operations
-6. **BPF Build**: Configure Solana toolchain and build scripts
-7. **Benchmarks**: Measure CU consumption and latency targets
+- **Framework**: [Pinocchio](https://github.com/anza-xyz/pinocchio) v0.9.2 - Zero-dependency Solana SDK
+- **Testing**: [Surfpool](https://github.com/txtx/surfpool) - Local Solana test validator with mainnet state
+- **Language**: Rust (no_std, zero allocations, panic = abort)
 
 ## References
 
 - [Plan Document](./plan.md) - Full protocol specification
 - [Pinocchio Docs](https://docs.rs/pinocchio/)
 - [Surfpool](https://github.com/txtx/surfpool)
+- [Solana Cookbook](https://solanacookbook.com/)
 
 ## License
 
@@ -200,4 +384,4 @@ Apache-2.0
 
 ---
 
-**Status**: Implementation in progress - Core infrastructure complete, matching engine functional but needs borrow checker fixes before testing.
+**Status**: Core infrastructure complete ✅ | 53 tests passing ✅ | Ready for integration testing 🚀

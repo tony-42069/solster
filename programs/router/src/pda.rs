@@ -119,6 +119,7 @@ pub fn derive_registry_pda(program_id: &Pubkey) -> (Pubkey, u8) {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "solana")]
     use super::*;
 
     // Note: PDA tests only run on Solana target due to syscall requirements
