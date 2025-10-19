@@ -11,5 +11,8 @@ doctest = false
 [dependencies]
 pinocchio = { workspace = true }
 
+[dev-dependencies]
+proptest = { workspace = true }
+
 [features]
 default = []

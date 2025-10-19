@@ -186,6 +186,14 @@ cargo test -- --nocapture
 cargo test --release
 ```
 
+**Integration and Property Tests:**
+
+The `tests/` directory contains templates for integration tests and property-based tests. These are currently disabled (code commented out) and serve as documentation until Surfpool is available. See [`tests/README.md`](tests/README.md) for details on:
+- Integration test scenarios (15+ tests across 3 files)
+- Property-based invariant tests
+- Setup instructions for Surfpool
+- How to enable and run the tests
+
 ### Build for Solana BPF
 ```bash
 # Install Solana toolchain (if not already installed)
@@ -348,18 +356,21 @@ cargo test --test integration test_reserve_and_commit_flow
 - Instruction dispatching framework
 - BPF build support (panic handlers, no_std)
 - Comprehensive unit tests (53 tests passing)
+- Integration test templates with Surfpool (3 test files with 15+ scenarios)
+- Property-based test framework with invariant checks
 
 ### 🚧 In Progress
-- Integration tests with Surfpool
-- Property-based invariant testing
-- BPF deployment and CU benchmarks
+- BPF deployment and CU benchmarks (requires Solana toolchain)
+- Instruction handler implementations (account validation, parsing)
+- Anti-toxicity mechanism integration (kill band, ARG enforcement)
 
 ### 📋 TODO
-- Anti-toxicity mechanism integration (kill band, ARG enforcement)
+- Implement instruction handler bodies (currently placeholders)
+- Complete integration tests (requires Surfpool setup)
+- Uncomment and run property tests
 - Funding rate updates (time-weighted calculations)
 - Liquidation execution (position closure, PnL settlement)
 - Router orchestration (multi-slab reserve/commit atomicity)
-- Instruction handler implementations (account validation, parsing)
 - Account initialization helpers
 - Client SDK (TypeScript/Rust)
 - CLI tools for LP operations
