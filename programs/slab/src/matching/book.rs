@@ -12,33 +12,45 @@ pub fn insert_order(
     price: u64,
     state: OrderState,
 ) -> Result<(), PercolatorError> {
-    let instrument = slab
-        .get_instrument_mut(instrument_idx)
-        .ok_or(PercolatorError::InvalidInstrument)?;
+    // Get the head pointer value (not a reference)
+    let head_ptr = {
+        let instrument = slab
+            .get_instrument(instrument_idx)
+            .ok_or(PercolatorError::InvalidInstrument)?;
 
-    let (head, pending_head) = match side {
-        Side::Buy => (&mut instrument.bids_head, &mut instrument.bids_pending_head),
-        Side::Sell => (&mut instrument.asks_head, &mut instrument.asks_pending_head),
-    };
-
-    let target_head = match state {
-        OrderState::LIVE => head,
-        OrderState::PENDING => pending_head,
+        match (side, state) {
+            (Side::Buy, OrderState::LIVE) => instrument.bids_head,
+            (Side::Buy, OrderState::PENDING) => instrument.bids_pending_head,
+            (Side::Sell, OrderState::LIVE) => instrument.asks_head,
+            (Side::Sell, OrderState::PENDING) => instrument.asks_pending_head,
+        }
     };
 
     // If empty list, set as head
-    if *target_head == u32::MAX {
-        *target_head = order_idx;
+    if head_ptr == u32::MAX {
         if let Some(order) = slab.orders.get_mut(order_idx) {
             order.next = u32::MAX;
             order.prev = u32::MAX;
         }
+
+        // Update instrument head
+        let instrument = slab.get_instrument_mut(instrument_idx).unwrap();
+        match (side, state) {
+            (Side::Buy, OrderState::LIVE) => instrument.bids_head = order_idx,
+            (Side::Buy, OrderState::PENDING) => instrument.bids_pending_head = order_idx,
+            (Side::Sell, OrderState::LIVE) => instrument.asks_head = order_idx,
+            (Side::Sell, OrderState::PENDING) => instrument.asks_pending_head = order_idx,
+        }
+
         slab.header.increment_book_seqno();
         return Ok(());
     }
 
+    // Get order_id for comparison
+    let new_order_id = slab.orders.get(order_idx).unwrap().order_id;
+
     // Find insertion point maintaining price-time priority
-    let mut curr_idx = *target_head;
+    let mut curr_idx = head_ptr;
     let mut prev_idx = u32::MAX;
 
     while curr_idx != u32::MAX {
@@ -53,13 +65,11 @@ pub fn insert_order(
         let should_insert_before = match side {
             Side::Buy => {
                 price > curr_order.price
-                    || (price == curr_order.price
-                        && slab.orders.get(order_idx).unwrap().order_id < curr_order.order_id)
+                    || (price == curr_order.price && new_order_id < curr_order.order_id)
             }
             Side::Sell => {
                 price < curr_order.price
-                    || (price == curr_order.price
-                        && slab.orders.get(order_idx).unwrap().order_id < curr_order.order_id)
+                    || (price == curr_order.price && new_order_id < curr_order.order_id)
             }
         };
 
@@ -79,8 +89,14 @@ pub fn insert_order(
 
     // Update prev's next
     if prev_idx == u32::MAX {
-        // Inserting at head
-        *target_head = order_idx;
+        // Inserting at head - update instrument head pointer
+        let instrument = slab.get_instrument_mut(instrument_idx).unwrap();
+        match (side, state) {
+            (Side::Buy, OrderState::LIVE) => instrument.bids_head = order_idx,
+            (Side::Buy, OrderState::PENDING) => instrument.bids_pending_head = order_idx,
+            (Side::Sell, OrderState::LIVE) => instrument.asks_head = order_idx,
+            (Side::Sell, OrderState::PENDING) => instrument.asks_pending_head = order_idx,
+        }
     } else if let Some(prev_order) = slab.orders.get_mut(prev_idx) {
         prev_order.next = order_idx;
     }
@@ -161,39 +177,46 @@ pub fn promote_pending(
 }
 
 /// Promote pending orders for one side
+/// Uses a two-pass approach to avoid heap allocation
 fn promote_side(
     slab: &mut SlabState,
     instrument_idx: u16,
     side: Side,
     epoch: u16,
 ) -> Result<(), PercolatorError> {
-    let instrument = slab
-        .get_instrument(instrument_idx)
-        .ok_or(PercolatorError::InvalidInstrument)?;
+    // Process orders one at a time to avoid allocations
+    loop {
+        let instrument = slab
+            .get_instrument(instrument_idx)
+            .ok_or(PercolatorError::InvalidInstrument)?;
 
-    let pending_head = match side {
-        Side::Buy => instrument.bids_pending_head,
-        Side::Sell => instrument.asks_pending_head,
-    };
+        let pending_head = match side {
+            Side::Buy => instrument.bids_pending_head,
+            Side::Sell => instrument.asks_pending_head,
+        };
 
-    let mut curr_idx = pending_head;
-    let mut to_promote = Vec::new();
+        // Find first eligible order
+        let mut curr_idx = pending_head;
+        let mut found_order = None;
 
-    // Collect orders to promote (eligible_epoch <= current epoch)
-    while curr_idx != u32::MAX {
-        if let Some(order) = slab.orders.get(curr_idx) {
-            if order.eligible_epoch <= epoch {
-                to_promote.push((curr_idx, order.price));
+        while curr_idx != u32::MAX {
+            if let Some(order) = slab.orders.get(curr_idx) {
+                if order.eligible_epoch <= epoch {
+                    found_order = Some((curr_idx, order.price));
+                    break;
+                }
+                curr_idx = order.next;
+            } else {
+                break;
             }
-            curr_idx = order.next;
-        } else {
-            break;
         }
-    }
 
-    // Promote each order
-    for (order_idx, price) in to_promote {
-        // Remove from pending
+        // If no eligible order found, we're done
+        let Some((order_idx, price)) = found_order else {
+            break;
+        };
+
+        // Promote this order
         remove_order(slab, instrument_idx, order_idx)?;
 
         // Update state to LIVE
@@ -229,13 +252,3 @@ pub fn get_best_prices(slab: &SlabState, instrument_idx: u16) -> Result<(Option<
     Ok((best_bid, best_ask))
 }
 
-// Note: Vec is used here for simplicity in the promotion logic.
-// In a no_std environment with no_allocator, this would need to be rewritten
-// to use a fixed-size buffer or multiple passes. For now, keeping it simple.
-#[cfg(not(feature = "no_std"))]
-extern crate alloc;
-#[cfg(not(feature = "no_std"))]
-use alloc::vec::Vec;
-
-#[cfg(feature = "no_std")]
-compile_error!("Promotion logic needs to be rewritten for no_std without allocation");

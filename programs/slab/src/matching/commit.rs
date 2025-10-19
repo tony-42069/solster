@@ -116,8 +116,9 @@ fn execute_slices(
 
         // Calculate fees
         let notional = mul_u64(qty, price);
-        let taker_fee = calculate_fee(notional, slab.header.taker_fee);
-        let maker_fee = calculate_fee(notional, slab.header.maker_fee);
+        let maker_fee_bps = slab.header.maker_fee;
+        let taker_fee = calculate_fee(notional, slab.header.taker_fee as i64);
+        let maker_fee = calculate_fee(notional, maker_fee_bps);
 
         total_qty = total_qty.saturating_add(qty);
         total_notional = total_notional.saturating_add(notional);
@@ -125,11 +126,11 @@ fn execute_slices(
 
         // Update maker's cash (subtract maker fee, can be negative for rebate)
         if let Some(maker) = slab.get_account_mut(maker_account_idx) {
-            if slab.header.maker_fee >= 0 {
+            if maker_fee_bps >= 0 {
                 maker.cash = maker.cash.saturating_sub(maker_fee as i128);
             } else {
                 // Negative fee = rebate
-                maker.cash = maker.cash.saturating_add(maker_fee.abs() as i128);
+                maker.cash = maker.cash.saturating_add(maker_fee as i128);
             }
         }
 
@@ -162,9 +163,11 @@ fn execute_trade(
     maker_order_id: u64,
     current_ts: u64,
 ) -> Result<(), PercolatorError> {
-    let instrument = slab
+    // Get cum_funding before any mutable borrows
+    let cum_funding = slab
         .get_instrument(instrument_idx)
-        .ok_or(PercolatorError::InvalidInstrument)?;
+        .ok_or(PercolatorError::InvalidInstrument)?
+        .cum_funding;
 
     // Update/create taker position
     let taker_qty = match side {
@@ -177,7 +180,7 @@ fn execute_trade(
         instrument_idx,
         taker_qty,
         price,
-        instrument.cum_funding,
+        cum_funding,
     )?;
 
     // Update/create maker position (opposite side)
@@ -188,7 +191,7 @@ fn execute_trade(
         instrument_idx,
         maker_qty,
         price,
-        instrument.cum_funding,
+        cum_funding,
     )?;
 
     // Record trade
@@ -218,13 +221,14 @@ fn update_position(
     price: u64,
     cum_funding: i128,
 ) -> Result<(), PercolatorError> {
-    // Find existing position
-    let account = slab
+    // Find existing position (immutable pass)
+    let position_head = slab
         .get_account(account_idx)
-        .ok_or(PercolatorError::InvalidAccount)?;
+        .ok_or(PercolatorError::InvalidAccount)?
+        .position_head;
 
-    let mut position_idx = account.position_head;
-    let mut found = false;
+    let mut position_idx = position_head;
+    let mut found = None;
 
     while position_idx != u32::MAX {
         let pos = slab
@@ -233,45 +237,54 @@ fn update_position(
             .ok_or(PercolatorError::PositionNotFound)?;
 
         if pos.instrument_idx == instrument_idx {
-            found = true;
+            found = Some(position_idx);
             break;
         }
 
         position_idx = pos.next_in_account;
     }
 
-    if found {
-        // Update existing position
-        if let Some(pos) = slab.positions.get_mut(position_idx) {
-            let new_qty = pos.qty + qty_delta;
+    if let Some(pos_idx) = found {
+        // Get position data before any mutable borrows
+        let (old_qty, old_entry_px) = {
+            let pos = slab.positions.get(pos_idx).unwrap();
+            (pos.qty, pos.entry_px)
+        };
 
-            if new_qty == 0 {
-                // Position closed - realize PnL
-                let pnl = calculate_pnl(pos.qty, pos.entry_px, price);
-                if let Some(account) = slab.get_account_mut(account_idx) {
-                    account.cash = account.cash.saturating_add(pnl);
-                }
+        let new_qty = old_qty + qty_delta;
 
-                // Remove position
-                remove_position(slab, account_idx, position_idx)?;
-            } else if (pos.qty > 0 && new_qty > 0) || (pos.qty < 0 && new_qty < 0) {
-                // Same direction - update VWAP
-                let abs_old = pos.qty.abs() as u64;
-                let abs_delta = qty_delta.abs() as u64;
-                let old_notional = mul_u64(abs_old, pos.entry_px);
-                let delta_notional = mul_u64(abs_delta, price);
-                let new_notional = old_notional.saturating_add(delta_notional);
-                pos.entry_px = calculate_vwap(new_notional, abs_old + abs_delta);
+        if new_qty == 0 {
+            // Position closed - realize PnL
+            let pnl = calculate_pnl(old_qty, old_entry_px, price);
+            if let Some(account) = slab.get_account_mut(account_idx) {
+                account.cash = account.cash.saturating_add(pnl);
+            }
+
+            // Remove position
+            remove_position(slab, account_idx, pos_idx)?;
+        } else if (old_qty > 0 && new_qty > 0) || (old_qty < 0 && new_qty < 0) {
+            // Same direction - update VWAP
+            let abs_old = old_qty.abs() as u64;
+            let abs_delta = qty_delta.abs() as u64;
+            let old_notional = mul_u64(abs_old, old_entry_px);
+            let delta_notional = mul_u64(abs_delta, price);
+            let new_notional = old_notional.saturating_add(delta_notional);
+            let new_entry_px = calculate_vwap(new_notional, abs_old + abs_delta);
+
+            // Now mutably update position
+            if let Some(pos) = slab.positions.get_mut(pos_idx) {
+                pos.entry_px = new_entry_px;
                 pos.qty = new_qty;
-            } else {
-                // Flipped - realize partial PnL
-                let close_qty = pos.qty;
-                let pnl = calculate_pnl(close_qty, pos.entry_px, price);
-                if let Some(account) = slab.get_account_mut(account_idx) {
-                    account.cash = account.cash.saturating_add(pnl);
-                }
+            }
+        } else {
+            // Flipped - realize partial PnL
+            let pnl = calculate_pnl(old_qty, old_entry_px, price);
+            if let Some(account) = slab.get_account_mut(account_idx) {
+                account.cash = account.cash.saturating_add(pnl);
+            }
 
-                // Set new position
+            // Set new position
+            if let Some(pos) = slab.positions.get_mut(pos_idx) {
                 pos.qty = new_qty;
                 pos.entry_px = price;
                 pos.last_funding = cum_funding;
@@ -284,6 +297,9 @@ fn update_position(
             .alloc()
             .ok_or(PercolatorError::PoolFull)?;
 
+        // Get position_head value before creating position
+        let pos_head = slab.get_account(account_idx).unwrap().position_head;
+
         if let Some(pos) = slab.positions.get_mut(pos_idx) {
             *pos = Position {
                 account_idx,
@@ -292,16 +308,16 @@ fn update_position(
                 qty: qty_delta,
                 entry_px: price,
                 last_funding: cum_funding,
-                next_in_account: account.position_head,
+                next_in_account: pos_head,
                 index: pos_idx,
                 used: true,
                 _padding2: [0; 7],
             };
+        }
 
-            // Update account position head
-            if let Some(account) = slab.get_account_mut(account_idx) {
-                account.position_head = pos_idx;
-            }
+        // Update account position head
+        if let Some(account) = slab.get_account_mut(account_idx) {
+            account.position_head = pos_idx;
         }
     }
 
@@ -435,6 +451,6 @@ fn calculate_fee(notional: u128, fee_bps: i64) -> u128 {
         (notional * (fee_bps as u128)) / 10_000
     } else {
         // Negative fee handled by caller
-        ((notional * (fee_bps.abs() as u128)) / 10_000)
+        (notional * ((-fee_bps) as u128)) / 10_000
     }
 }

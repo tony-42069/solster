@@ -26,16 +26,20 @@ pub fn reserve(
     commitment_hash: [u8; 32],
     route_id: u64,
 ) -> Result<ReserveResult, PercolatorError> {
-    // Validate instrument
-    let instrument = slab
-        .get_instrument(instrument_idx)
-        .ok_or(PercolatorError::InvalidInstrument)?;
+    // Validate instrument and get needed values
+    let (tick, lot, contract_size) = {
+        let instrument = slab
+            .get_instrument(instrument_idx)
+            .ok_or(PercolatorError::InvalidInstrument)?;
+
+        (instrument.tick, instrument.lot, instrument.contract_size)
+    };
 
     // Check alignment
-    if !is_tick_aligned(limit_px, instrument.tick) {
+    if !is_tick_aligned(limit_px, tick) {
         return Err(PercolatorError::PriceNotAligned);
     }
-    if !is_lot_aligned(qty, instrument.lot) {
+    if !is_lot_aligned(qty, lot) {
         return Err(PercolatorError::QuantityNotAligned);
     }
 
@@ -64,15 +68,13 @@ pub fn reserve(
     };
 
     // Calculate max charge (notional + fees)
-    let max_charge = calculate_max_charge(
-        filled_qty,
-        worst_px,
-        instrument.contract_size,
-        slab.header.taker_fee,
-    );
+    let taker_fee = slab.header.taker_fee;
+    let max_charge = calculate_max_charge(filled_qty, worst_px, contract_size, taker_fee);
 
     // Create reservation
-    let expiry_ms = slab.header.current_ts.saturating_add(ttl_ms);
+    let book_seqno = slab.header.book_seqno;
+    let current_ts = slab.header.current_ts;
+    let expiry_ms = current_ts.saturating_add(ttl_ms);
 
     if let Some(resv) = slab.reservations.get_mut(resv_idx) {
         *resv = Reservation {
@@ -88,7 +90,7 @@ pub fn reserve(
             max_charge,
             commitment_hash,
             salt: [0; 16], // Will be revealed at commit
-            book_seqno: slab.header.book_seqno,
+            book_seqno,
             expiry_ms,
             slice_head,
             index: resv_idx,
@@ -104,7 +106,7 @@ pub fn reserve(
         worst_px,
         max_charge,
         expiry_ms,
-        book_seqno: slab.header.book_seqno,
+        book_seqno,
         filled_qty,
     })
 }
@@ -116,15 +118,17 @@ fn walk_and_reserve(
     side: Side,
     qty: u64,
     limit_px: u64,
-    resv_idx: u32,
+    _resv_idx: u32,
 ) -> Result<(u64, u128, u64, u32), PercolatorError> {
-    let instrument = slab
-        .get_instrument(instrument_idx)
-        .ok_or(PercolatorError::InvalidInstrument)?;
+    let head = {
+        let instrument = slab
+            .get_instrument(instrument_idx)
+            .ok_or(PercolatorError::InvalidInstrument)?;
 
-    let head = match side {
-        Side::Buy => instrument.bids_head,
-        Side::Sell => instrument.asks_head,
+        match side {
+            Side::Buy => instrument.bids_head,
+            Side::Sell => instrument.asks_head,
+        }
     };
 
     let mut curr_idx = head;
@@ -135,15 +139,20 @@ fn walk_and_reserve(
     let mut slice_tail = u32::MAX;
 
     while curr_idx != u32::MAX && qty_left > 0 {
-        let order = slab
-            .orders
-            .get(curr_idx)
-            .ok_or(PercolatorError::OrderNotFound)?;
+        // Get order info (immutable borrow)
+        let (order_price, order_qty, order_reserved_qty, order_next) = {
+            let order = slab
+                .orders
+                .get(curr_idx)
+                .ok_or(PercolatorError::OrderNotFound)?;
+
+            (order.price, order.qty, order.reserved_qty, order.next)
+        };
 
         // Check price limit
         let crosses = match side {
-            Side::Buy => order.price <= limit_px,
-            Side::Sell => order.price >= limit_px,
+            Side::Buy => order_price <= limit_px,
+            Side::Sell => order_price >= limit_px,
         };
 
         if !crosses {
@@ -151,9 +160,9 @@ fn walk_and_reserve(
         }
 
         // Calculate available quantity
-        let available = order.qty.saturating_sub(order.reserved_qty);
+        let available = order_qty.saturating_sub(order_reserved_qty);
         if available == 0 {
-            curr_idx = order.next;
+            curr_idx = order_next;
             continue;
         }
 
@@ -189,10 +198,10 @@ fn walk_and_reserve(
 
         // Update totals
         qty_left = qty_left.saturating_sub(take_qty);
-        total_notional = total_notional.saturating_add(mul_u64(take_qty, order.price));
-        worst_px = order.price;
+        total_notional = total_notional.saturating_add(mul_u64(take_qty, order_price));
+        worst_px = order_price;
 
-        curr_idx = order.next;
+        curr_idx = order_next;
     }
 
     let filled_qty = qty.saturating_sub(qty_left);

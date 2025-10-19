@@ -1,6 +1,5 @@
 //! Reserve instruction - stub implementation
 
-use crate::matching::reserve as reserve_fn;
 use crate::state::SlabState;
 use percolator_common::*;
 
