@@ -38,8 +38,8 @@ pub struct SlabState {
     pub trade_head: u32,
     pub trade_count: u32,
 
-    /// Aggressor ledger pool
-    pub aggressor_ledger: Pool<AggressorEntry, MAX_ACCOUNTS>,
+    /// Aggressor ledger pool (shared, not per account)
+    pub aggressor_ledger: Pool<AggressorEntry, MAX_AGGRESSOR_ENTRIES>,
 }
 
 impl SlabState {

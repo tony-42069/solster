@@ -118,8 +118,7 @@ impl SlabHeader {
             max_reservations: percolator_common::MAX_RESERVATIONS as u32,
             max_slices: percolator_common::MAX_SLICES as u32,
             max_trades: percolator_common::MAX_TRADES as u32,
-            max_aggressor_entries: (percolator_common::MAX_ACCOUNTS
-                * percolator_common::MAX_INSTRUMENTS) as u32,
+            max_aggressor_entries: percolator_common::MAX_AGGRESSOR_ENTRIES as u32,
             next_order_id: 1,
             next_hold_id: 1,
             book_seqno: 0,

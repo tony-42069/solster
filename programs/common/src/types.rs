@@ -9,22 +9,22 @@ pub const MAX_SLABS: usize = 256;
 pub const MAX_INSTRUMENTS: usize = 32;
 
 /// Maximum number of accounts per slab
-pub const MAX_ACCOUNTS: usize = 10_000;
+pub const MAX_ACCOUNTS: usize = 5_000;
 
 /// Maximum number of orders per slab
-pub const MAX_ORDERS: usize = 80_000;
+pub const MAX_ORDERS: usize = 30_000;
 
 /// Maximum number of positions per slab
-pub const MAX_POSITIONS: usize = 80_000;
+pub const MAX_POSITIONS: usize = 30_000;
 
 /// Maximum number of reservations per slab
-pub const MAX_RESERVATIONS: usize = 8_000;
+pub const MAX_RESERVATIONS: usize = 4_000;
 
 /// Maximum number of slices per slab
-pub const MAX_SLICES: usize = 32_000;
+pub const MAX_SLICES: usize = 16_000;
 
 /// Maximum number of trades in ring buffer
-pub const MAX_TRADES: usize = 20_000;
+pub const MAX_TRADES: usize = 10_000;
 
 /// Maximum number of DLP accounts
 pub const MAX_DLP: usize = 100;
@@ -34,16 +34,18 @@ pub const MAX_CAP_TTL_MS: u64 = 120_000;
 
 /// Order side
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Side {
+    #[default]
     Buy = 0,
     Sell = 1,
 }
 
 /// Time in force
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TimeInForce {
+    #[default]
     GTC = 0, // Good till cancel
     IOC = 1, // Immediate or cancel
     FOK = 2, // Fill or kill
@@ -51,16 +53,18 @@ pub enum TimeInForce {
 
 /// Maker class
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MakerClass {
+    #[default]
     REG = 0, // Regular - goes to pending queue
     DLP = 1, // Designated LP - posts immediately
 }
 
 /// Order state
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OrderState {
+    #[default]
     LIVE = 0,    // Active in book
     PENDING = 1, // Waiting for promotion
 }
@@ -127,7 +131,7 @@ pub struct Instrument {
 
 /// Order in the book
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Order {
     /// Order ID (monotonic)
     pub order_id: u64,
@@ -169,7 +173,7 @@ pub struct Order {
 
 /// Position
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Position {
     /// Account index
     pub account_idx: u32,
@@ -195,7 +199,7 @@ pub struct Position {
 
 /// Slice in a reservation
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Slice {
     /// Order index being reserved
     pub order_idx: u32,
@@ -213,7 +217,7 @@ pub struct Slice {
 
 /// Reservation hold
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Reservation {
     /// Unique hold ID
     pub hold_id: u64,
@@ -283,7 +287,7 @@ pub struct Trade {
 
 /// Aggressor ledger entry for anti-sandwich
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct AggressorEntry {
     /// Account index
     pub account_idx: u32,
@@ -305,6 +309,9 @@ pub struct AggressorEntry {
     pub _padding: [u8; 7],
 }
 
+/// Maximum aggressor ledger entries (shared pool, not per account-instrument)
+pub const MAX_AGGRESSOR_ENTRIES: usize = 4_000;
+
 // Size checks to ensure we're within 10 MB for slab
 const _: () = {
     const fn check_size() {
@@ -316,7 +323,7 @@ const _: () = {
             + (MAX_RESERVATIONS * core::mem::size_of::<Reservation>())
             + (MAX_SLICES * core::mem::size_of::<Slice>())
             + (MAX_TRADES * core::mem::size_of::<Trade>())
-            + (MAX_ACCOUNTS * MAX_INSTRUMENTS * core::mem::size_of::<AggressorEntry>());
+            + (MAX_AGGRESSOR_ENTRIES * core::mem::size_of::<AggressorEntry>());
 
         // Should be under 10 MB
         const MAX_SLAB_SIZE: usize = 10 * 1024 * 1024;

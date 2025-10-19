@@ -11,4 +11,4 @@ pub use state::*;
 pub use instructions::*;
 pub use matching::*;
 
-pinocchio_pubkey::declare_id!("SlabXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+pinocchio_pubkey::declare_id!("SLabZ6PsDLh2X6HzEoqxFDMqCVcJXDKCNEYuPzUvGPk");
