@@ -163,10 +163,6 @@ pub fn promote_pending(
     instrument_idx: u16,
     epoch: u16,
 ) -> Result<(), PercolatorError> {
-    let instrument = slab
-        .get_instrument_mut(instrument_idx)
-        .ok_or(PercolatorError::InvalidInstrument)?;
-
     // Promote bids
     promote_side(slab, instrument_idx, Side::Buy, epoch)?;
 

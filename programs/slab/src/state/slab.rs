@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn test_slab_size() {
         let size = core::mem::size_of::<SlabState>();
-        println!("SlabState size: {} bytes ({:.2} MB)", size, size as f64 / 1024.0 / 1024.0);
+        // Size should be <= 10 MB
         assert!(size <= 10 * 1024 * 1024);
     }
 }
