@@ -98,9 +98,11 @@ LP-run perp engines with 10 MB state budget, fully self-contained matching and s
 - ✅ Fixed-point math utilities
 - ✅ Compile-time size constraints
 
-### In Progress
-- ⏳ Commit operation (has borrow checker issues to resolve)
-- ⏳ Position management (needs refactoring for Rust borrow rules)
+### ✅ Recently Completed
+- ✅ Commit operation (borrow checker issues resolved)
+- ✅ Position management (refactored for proper Rust borrow semantics)
+- ✅ Zero-allocation order promotion (removed Vec usage)
+- ✅ All matching engine functions compile successfully
 
 ### TODO
 - ❌ Anti-toxicity mechanism integration
@@ -158,15 +160,23 @@ cargo build
 cargo test
 ```
 
-## Known Issues
+## Recent Improvements
 
-1. **Borrow Checker Errors**: The commit module has several places where we need mutable access to different parts of `SlabState` simultaneously. This needs refactoring to use split borrows or interior mutability patterns.
+1. **✅ Borrow Checker Resolved**: All borrow checker errors fixed by:
+   - Extracting values before mutable borrows
+   - Separating data gathering from mutation phases
+   - Caching header/instrument values to avoid conflicts
 
-2. **Vec Usage**: The `promote_pending` function temporarily uses `Vec` for collecting orders to promote. In a true no_std/no_alloc environment, this needs to be rewritten with a fixed buffer or multiple passes.
+2. **✅ Zero Allocations**: Replaced Vec-based promotion with iterative single-pass approach
 
-3. **Missing Tests**: Core logic has inline tests, but comprehensive unit/integration/property tests are needed.
+3. **✅ Type Safety**: Fixed all fee calculation type mismatches
 
-4. **BPF Build**: Programs don't yet build for the Solana BPF target. Need to configure proper build scripts.
+## Remaining Work
+
+1. **BPF Build**: Programs need panic handler when building as cdylib for Solana
+2. **Missing Tests**: Comprehensive unit/integration/property tests needed
+3. **Instruction Handlers**: Wire up instruction parsing and account validation
+4. **PDA Derivations**: Implement seed generation for all account types
 
 ## Next Steps
 
