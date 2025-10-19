@@ -3,6 +3,7 @@
 pub mod state;
 pub mod instructions;
 pub mod matching;
+pub mod pda;
 
 #[cfg(feature = "bpf-entrypoint")]
 mod entrypoint;
