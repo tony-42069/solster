@@ -6,6 +6,13 @@ pub mod instructions;
 #[cfg(feature = "bpf-entrypoint")]
 mod entrypoint;
 
+// Panic handler for no_std builds (not needed in tests)
+#[cfg(not(test))]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
+
 pub use state::*;
 pub use instructions::*;
 
