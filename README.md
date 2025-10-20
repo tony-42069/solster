@@ -360,21 +360,41 @@ cargo test --test integration test_reserve_and_commit_flow
 - Property-based test framework with invariant checks
 
 ### 🚧 In Progress
-- BPF deployment and CU benchmarks (requires Solana toolchain)
-- Instruction handler implementations (account validation, parsing)
-- Anti-toxicity mechanism integration (kill band, ARG enforcement)
+- Integration testing infrastructure (Surfpool setup and runbook development)
+- Solana build tooling setup (cargo build-sbf installation)
 
-### 📋 TODO
-- Implement instruction handler bodies (currently placeholders)
-- Complete integration tests (requires Surfpool setup)
-- Uncomment and run property tests
-- Funding rate updates (time-weighted calculations)
-- Liquidation execution (position closure, PnL settlement)
+### 📋 Next Steps (Priority Order)
+
+**Phase 1: Complete Core Program Logic**
+- Implement instruction handler bodies (account validation, deserialization)
+- Complete anti-toxicity mechanism integration (kill band, JIT penalty, ARG)
+- Implement funding rate updates (time-weighted calculations)
+- Implement liquidation execution (position closure, PnL settlement)
+- Add account initialization helpers
+
+**Phase 2: Build and Deploy**
+- Set up Solana Platform Tools for BPF builds
+- Build programs with `cargo build-sbf`
+- Deploy to local test validator for manual testing
+- Measure CU (Compute Unit) consumption and optimize
+
+**Phase 3: Advanced Testing**
+- Complete integration tests (Option B: traditional Solana testing or Option A: Surfpool once runbook format is clarified)
+- Uncomment and run property-based tests
+- Add fuzz tests for instruction parsing and edge cases
+- Implement chaos/soak tests (24-72h load testing)
+
+**Phase 4: Multi-Slab Coordination**
 - Router orchestration (multi-slab reserve/commit atomicity)
-- Slab-level insurance pools (v1 feature - isolated per slab, no router pool)
-- Account initialization helpers
+- Cross-slab portfolio margin calculations
+- Global liquidation coordination
+
+**Phase 5: Production Readiness**
+- Slab-level insurance pools (v1 feature)
 - Client SDK (TypeScript/Rust)
 - CLI tools for LP operations
+- Operational runbooks and monitoring
+- Security audits
 - Documentation and examples
 
 ### Architecture Notes
@@ -390,6 +410,30 @@ cargo test --test integration test_reserve_and_commit_flow
 - **Testing**: [Surfpool](https://github.com/txtx/surfpool) - Local Solana test validator with mainnet state
 - **Language**: Rust (no_std, zero allocations, panic = abort)
 
+## Surfpool Integration Status
+
+### Current Status
+Surfpool is installed and configured, but full integration testing is pending due to challenges with Pinocchio-based programs.
+
+### Challenges
+1. **Runbook Format**: Surfpool uses `txtx` runbooks (`.tx` files) with a Terraform-inspired declarative syntax. The exact action syntax for Pinocchio programs (non-Anchor) is not well-documented.
+2. **Auto-generation**: Surfpool's automatic runbook generation appears optimized for Anchor projects. Pinocchio-based programs may require manually crafted runbooks.
+3. **Build Tooling**: `cargo build-sbf` is needed to compile programs for Solana BPF target, but isn't available via standard `cargo install`.
+
+### Files Created
+- `Surfpool.toml` - Manifest configuration for Percolator programs
+- `.surfpool/runbooks/test_basic.tx` - Basic connectivity test runbook (template)
+
+### Next Steps for Surfpool Integration
+1. **Option A - Manual Runbooks**: Research txtx documentation at `docs.txtx.sh` to understand proper action syntax for Pinocchio programs
+2. **Option B - Traditional Testing**: Use standard Solana testing tools with local validator:
+   - Build programs with `cargo build-sbf` (requires Solana Platform Tools installation)
+   - Deploy to local test validator with `solana program deploy`
+   - Write integration tests using `solana-program-test` crate
+3. **Option C - Anchor Wrapper**: Create minimal Anchor wrappers around Pinocchio programs for Surfpool compatibility
+
+For now, the project focuses on comprehensive unit testing (53 tests passing) while integration test infrastructure is being developed.
+
 ## References
 
 - [Plan Document](./plan.md) - Full protocol specification
@@ -403,4 +447,6 @@ Apache-2.0
 
 ---
 
-**Status**: Core infrastructure complete ✅ | 53 tests passing ✅ | Ready for integration testing 🚀
+**Status**: Core infrastructure complete ✅ | 53 unit tests passing ✅ | Phase 1 (instruction handlers) next 🚀
+
+**Last Updated**: October 20, 2025

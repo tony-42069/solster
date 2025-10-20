@@ -40,7 +40,7 @@ Scope: On-chain programs, 10 MB slab engines, aggregator Router, collateral/secu
 	•	Slabs can only debit escrow via an unexpired Cap scoped to (user, this_slab, asset) and **≤ amount_max`.
 	•	Router never honors slab “pull” requests; it push-pledges escrow before commit.
 
-Must-hold invariant: No path exists for a slab to move funds for any (user’, slab’) ≠ (user, this_slab); Router global insurance cannot be debited by a slab directly.
+Must-hold invariant: No path exists for a slab to move funds for any (user’, slab’) ≠ (user, this_slab); Router has no insurance pool, and cannot be debited by a slab directly.
 
 ⸻
 

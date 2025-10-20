@@ -11,13 +11,13 @@ router = "programs/router"
 slab = "programs/slab"
 
 [runbooks]
-# Auto-generated deployment runbook
-deployment = ".surfpool/runbooks/deployment.tx"
+# Basic connectivity test
+test_basic = ".surfpool/runbooks/test_basic.tx"
 
-# Custom test runbooks
-test_initialization = ".surfpool/runbooks/test_initialization.tx"
-test_reserve_commit = ".surfpool/runbooks/test_reserve_commit.tx"
-test_portfolio = ".surfpool/runbooks/test_portfolio.tx"
+# Custom test runbooks (TODO)
+# test_initialization = ".surfpool/runbooks/test_initialization.tx"
+# test_reserve_commit = ".surfpool/runbooks/test_reserve_commit.tx"
+# test_portfolio = ".surfpool/runbooks/test_portfolio.tx"
 
 [settings]
 rpc_url = "https://api.mainnet-beta.solana.com"
