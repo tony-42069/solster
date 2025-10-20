@@ -1,4 +1,18 @@
-/// Router instructions (stub implementations)
+/// Router instruction handlers
+
+pub mod deposit;
+pub mod withdraw;
+pub mod initialize;
+pub mod multi_reserve;
+pub mod multi_commit;
+pub mod liquidate;
+
+pub use deposit::*;
+pub use withdraw::*;
+pub use initialize::*;
+pub use multi_reserve::*;
+pub use multi_commit::*;
+pub use liquidate::*;
 
 use percolator_common::*;
 
@@ -20,9 +34,29 @@ pub enum RouterInstruction {
     Liquidate = 5,
 }
 
+/// Process router instruction
+///
+/// Routes instruction to appropriate handler based on discriminator.
+/// Note: This is a simplified dispatcher - actual BPF entrypoint will
+/// handle account deserialization and validation.
 pub fn process_instruction(
-    _instruction: RouterInstruction,
+    instruction: RouterInstruction,
     _data: &[u8],
 ) -> Result<(), PercolatorError> {
-    Ok(())
+    match instruction {
+        RouterInstruction::Initialize => process_initialize(),
+        RouterInstruction::Deposit => {
+            // TODO: Deserialize vault and amount from _data
+            // process_deposit(vault, amount)
+            Ok(())
+        }
+        RouterInstruction::Withdraw => {
+            // TODO: Deserialize vault and amount from _data
+            // process_withdraw(vault, amount)
+            Ok(())
+        }
+        RouterInstruction::MultiReserve => process_multi_reserve(),
+        RouterInstruction::MultiCommit => process_multi_commit(),
+        RouterInstruction::Liquidate => process_liquidate(),
+    }
 }
