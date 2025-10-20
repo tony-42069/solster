@@ -371,10 +371,18 @@ cargo test --test integration test_reserve_and_commit_flow
 - Funding rate updates (time-weighted calculations)
 - Liquidation execution (position closure, PnL settlement)
 - Router orchestration (multi-slab reserve/commit atomicity)
+- Slab-level insurance pools (v1 feature - isolated per slab, no router pool)
 - Account initialization helpers
 - Client SDK (TypeScript/Rust)
 - CLI tools for LP operations
 - Documentation and examples
+
+### Architecture Notes
+
+**v0 Simplifications:**
+- ✅ No router-level insurance pool (each slab manages its own isolated insurance fund)
+- Individual slabs will implement their own insurance pools in v1
+- This maintains full isolation between slabs and simplifies router logic
 
 ## Technology Stack
 
