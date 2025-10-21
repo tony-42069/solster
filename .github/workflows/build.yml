@@ -1,0 +1,32 @@
+name: Build Solana Programs
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.75.0
+          override: true
+      
+      - name: Install Solana
+        run: |
+          sh -c ""
+          echo "C:\Users\Dorian/.local/share/solana/install/active_release/bin" >> 
+      
+      - name: Build Programs
+        run: cargo build-sbf
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: solana-programs
+          path: target/deploy/*.so
