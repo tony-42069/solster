@@ -17,10 +17,17 @@ jobs:
       - name: Install Solana
         run: |
           sh -c "$(curl -sSfL https://release.solana.com/v1.17.31/install)"
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          ls -la $HOME/.local/share/solana/install/active_release/bin/
       
       - name: Build Programs
-        run: cargo build-sbf
+        run: |
+          rm -f Cargo.lock
+          rustup target add bpfel-unknown-unknown
+          $HOME/.local/share/solana/install/active_release/bin/cargo-build-bpf || cargo build --release --target bpfel-unknown-unknown
+          mkdir -p target/deploy
+          find target -name "*.so" -exec cp {} target/deploy/ \;
       
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
