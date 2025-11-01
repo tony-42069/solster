@@ -1,62 +1,72 @@
-/// Router instruction handlers
+/// Router instruction handlers (v0 minimal)
 
+pub mod initialize;
+pub mod initialize_portfolio;
 pub mod deposit;
 pub mod withdraw;
-pub mod initialize;
-pub mod multi_reserve;
-pub mod multi_commit;
-pub mod liquidate;
+pub mod execute_cross_slab;
+pub mod liquidate_user;
+pub mod burn_lp_shares;
+pub mod cancel_lp_orders;
+// pub mod register_slab;  // REMOVED - permissionless matchers
+pub mod router_reserve;
+pub mod router_release;
+pub mod router_liquidity;
+pub mod router_seat_init;
+pub mod withdraw_insurance;
+pub mod topup_insurance;
 
+pub use initialize::*;
+pub use initialize_portfolio::*;
 pub use deposit::*;
 pub use withdraw::*;
-pub use initialize::*;
-pub use multi_reserve::*;
-pub use multi_commit::*;
-pub use liquidate::*;
+pub use execute_cross_slab::*;
+pub use liquidate_user::*;
+pub use burn_lp_shares::*;
+pub use cancel_lp_orders::*;
+// pub use register_slab::*;  // REMOVED - permissionless matchers
+pub use router_reserve::*;
+pub use router_release::*;
+pub use router_liquidity::*;
+pub use router_seat_init::*;
+pub use withdraw_insurance::*;
+pub use topup_insurance::*;
 
-use percolator_common::*;
-
-/// Instruction discriminator
+/// Instruction discriminator (v0 minimal)
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RouterInstruction {
-    /// Initialize router
+    /// Initialize router registry
     Initialize = 0,
-    /// Deposit collateral
-    Deposit = 1,
-    /// Withdraw collateral
-    Withdraw = 2,
-    /// Multi-slab reserve orchestration
-    MultiReserve = 3,
-    /// Multi-slab commit orchestration
-    MultiCommit = 4,
-    /// Liquidation coordinator
-    Liquidate = 5,
+    /// Initialize user portfolio
+    InitializePortfolio = 1,
+    /// Deposit collateral to vault
+    Deposit = 2,
+    /// Withdraw collateral from vault
+    Withdraw = 3,
+    /// Execute cross-slab order (v0 main instruction)
+    ExecuteCrossSlab = 4,
+    /// Liquidate user positions (reduce-only)
+    LiquidateUser = 5,
+    /// Burn AMM LP shares (ONLY way to reduce AMM LP exposure)
+    BurnLpShares = 6,
+    /// Cancel Slab LP orders (ONLY way to reduce Slab LP exposure)
+    CancelLpOrders = 7,
+    // RegisterSlab = 8,  // REMOVED - permissionless matchers (users choose their own)
+    /// Reserve collateral from portfolio into LP seat
+    RouterReserve = 9,
+    /// Release collateral from LP seat back to portfolio
+    RouterRelease = 10,
+    /// Process liquidity operation via matcher adapter
+    RouterLiquidity = 11,
+    /// Initialize LP seat for adapter pattern
+    RouterSeatInit = 12,
+    /// Withdraw surplus from insurance fund
+    WithdrawInsurance = 13,
+    /// Top up insurance fund
+    TopUpInsurance = 14,
 }
 
-/// Process router instruction
-///
-/// Routes instruction to appropriate handler based on discriminator.
-/// Note: This is a simplified dispatcher - actual BPF entrypoint will
-/// handle account deserialization and validation.
-pub fn process_instruction(
-    instruction: RouterInstruction,
-    _data: &[u8],
-) -> Result<(), PercolatorError> {
-    match instruction {
-        RouterInstruction::Initialize => process_initialize(),
-        RouterInstruction::Deposit => {
-            // TODO: Deserialize vault and amount from _data
-            // process_deposit(vault, amount)
-            Ok(())
-        }
-        RouterInstruction::Withdraw => {
-            // TODO: Deserialize vault and amount from _data
-            // process_withdraw(vault, amount)
-            Ok(())
-        }
-        RouterInstruction::MultiReserve => process_multi_reserve(),
-        RouterInstruction::MultiCommit => process_multi_commit(),
-        RouterInstruction::Liquidate => process_liquidate(),
-    }
-}
+// Note: Instruction dispatching is handled in entrypoint.rs
+// The functions in this module are called from the entrypoint after
+// account deserialization and validation.

@@ -1,11 +1,22 @@
 pub mod vault;
-pub mod escrow;
-pub mod cap;
 pub mod portfolio;
 pub mod registry;
+pub mod lp_bucket;
+pub mod lp_seat;
+pub mod venue_pnl;
+pub mod insurance;
+pub mod pnl_vesting;
+pub mod model_bridge;
+
+#[cfg(test)]
+pub mod withdrawal_limits_test;
 
 pub use vault::*;
-pub use escrow::*;
-pub use cap::*;
 pub use portfolio::*;
 pub use registry::*;
+pub use lp_bucket::*;
+pub use lp_seat::*;
+pub use venue_pnl::*;
+pub use insurance::*;
+pub use pnl_vesting::*;
+pub use model_bridge::*;

@@ -1,28 +1,24 @@
-#![no_std]
+#![cfg_attr(target_os = "solana", no_std)]
 
 pub mod state;
 pub mod instructions;
-pub mod matching;
 pub mod pda;
+pub mod adapter;
 
-#[cfg(feature = "bpf-entrypoint")]
-mod entrypoint;
+// Always expose entrypoint for testing
+pub mod entrypoint;
 
 #[cfg(test)]
 mod tests;
 
-// Panic handler for no_std builds (not needed in tests)
-#[cfg(not(test))]
+// Panic handler for no_std builds (only for Solana BPF)
+#[cfg(all(target_os = "solana", not(test)))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
 pub use state::*;
-
-// Re-export modules without glob to avoid ambiguous names
 pub use instructions::SlabInstruction;
-pub use matching::{insert_order, remove_order, promote_pending};
-pub use matching::{calculate_equity, calculate_margin_requirements, is_liquidatable};
 
-pinocchio_pubkey::declare_id!("SLabZ6PsDLh2X6HzEoqxFDMqCVcJXDKCNEYuPzUvGPk");
+pinocchio_pubkey::declare_id!("8HkaHrEmhP7R9UCUhHPibQTCjBFPgNVb4HEuvPzN28ox");

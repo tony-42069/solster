@@ -12,6 +12,7 @@ pub enum PercolatorError {
     InsufficientFunds = 4,
     Overflow = 5,
     Underflow = 6,
+    Unauthorized = 7,
 
     // Router errors (100-199)
     InvalidSlab = 100,
@@ -23,6 +24,13 @@ pub enum PercolatorError {
     EscrowInsufficientBalance = 106,
     PortfolioInsufficientMargin = 107,
     InvalidPortfolio = 108,
+    CpiFailed = 109,
+    PortfolioHealthy = 110,
+    LiquidationCooldown = 111,
+    InvalidAmount = 112,
+    InsufficientBalance = 113,
+    StalePrice = 114,
+    AlreadyInitialized = 115,
 
     // Slab errors (200-299)
     InvalidInstrument = 200,
@@ -38,6 +46,16 @@ pub enum PercolatorError {
     InvalidPrice = 210,
     InvalidQuantity = 211,
     PoolFull = 212,
+    SeqnoMismatch = 213,
+    InvalidTickSize = 214,
+    InvalidLotSize = 215,
+    OrderTooSmall = 216,
+    WouldCross = 217,
+    CannotFillCompletely = 218,
+    SelfTrade = 219,
+    TradingHalted = 220,
+    PriceBandViolation = 221,      // Scenario 17: Price exceeds band from best bid/ask
+    OracleBandViolation = 222,     // Scenario 37: Price exceeds band from oracle price
 
     // Matching errors (300-399)
     InvalidSide = 300,
@@ -64,5 +82,11 @@ pub enum PercolatorError {
 impl From<PercolatorError> for u64 {
     fn from(e: PercolatorError) -> u64 {
         e as u64
+    }
+}
+
+impl From<PercolatorError> for pinocchio::program_error::ProgramError {
+    fn from(e: PercolatorError) -> Self {
+        pinocchio::program_error::ProgramError::from(e as u64)
     }
 }

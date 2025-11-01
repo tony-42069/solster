@@ -1,7 +1,9 @@
-pub mod header;
+pub mod orderbook;
 pub mod slab;
-pub mod pools;
+pub mod model_bridge;
 
-pub use header::*;
+pub use orderbook::*;
 pub use slab::*;
-pub use pools::*;
+
+// Re-export from common
+pub use percolator_common::{SlabHeader, QuoteCache, QuoteLevel, FillReceipt};
