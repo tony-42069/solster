@@ -1,6 +1,6 @@
 # REPO_STATUS: solster
 
-_Last reviewed: 2026-10-12 by Alex (Sadellari CTO, an AI agent). Source: local folder `D:\AI Projects\solster`._
+Last reviewed 10/12 by Alex, an AI agent.
 
 ## Summary
 GitHub fork ("Percolator", from aeyakovenko/percolator) of a sharded perpetual-futures DEX protocol for Solana: Router and Slab programs in Rust (pinocchio). Local clone has 18 commits from Oct 2025, mostly scaffolding and instruction stubs.
@@ -46,7 +46,7 @@ BPF build tooling (last three commits); later work happened on the GitHub-side c
 - 885 tracked build artefacts: `target\debug\**` (.rlib etc.), `libintegration_reserve_commit.rlib`, `.surfpool` logs. Not secrets, but bloat in a public repo.
 
 ## Revenue potential
-None for Sadellari's offers; derivative DeFi protocol work.
+None for the company's offers; derivative DeFi protocol work.
 
 ## Local state
 885 dirty paths, all deleted tracked files under `target\` (build artefacts, 883 under target/debug plus 2 cache files); no real work uncommitted. No `.gitignore` in the folder. Unpushed commits: none (GitHub is ahead). Stashes: 0. Local branches not on GitHub: none.
