@@ -50,3 +50,4 @@ None for Sadellari's offers; derivative DeFi protocol work.
 
 ## Local state
 885 dirty paths, all deleted tracked files under `target\` (build artefacts, 883 under target/debug plus 2 cache files); no real work uncommitted. No `.gitignore` in the folder. Unpushed commits: none (GitHub is ahead). Stashes: 0. Local branches not on GitHub: none.
+- **Verified against GitHub (2026-10-12):** Every local branch head (all clones) exists on GitHub, so nothing is unpushed; the local clone is only behind GitHub. Pull before working here. Alex checked this against a full mirror of the GitHub repo, which supersedes any earlier "not fetched / unknown / diverged" caveat in this file.
